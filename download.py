@@ -46,14 +46,22 @@ def show_version():
     print("Dmp download version 1.0.0 EternalZZX")
 
 
+def format_url(origin_url):
+    if 'minghuaji' in origin_url:
+        return origin_url.replace('index.html', 'resource/img/')
+    else:
+        return 'http://en.dpm.org.cn' + re.split('path=', origin_url)[1].replace('.xml', '') + '_files/'
+
+
 def download_pic(pic_url, download_path='download', only_max=True, pic_format='jpg'):
-    pic_url = re.split('path=', pic_url)[1].replace('.xml', '') + '_files/'
-    folder = 13 if only_max else 0
+    pic_url = format_url(pic_url)
+    is_begin = False
+    folder = 20
     x, y = 0, 0
     x_max, y_max = 0, 0
-    while folder <= 13:
+    while folder >= 0:
         while True:
-            download_url = 'http://en.dpm.org.cn' + pic_url + str(folder) + \
+            download_url = pic_url + str(folder) + \
                            '/' + str(x) + '_' + str(y) + '.' + pic_format
             result = requests.get(download_url)
             print('Response: ' + str(result.status_code) + ' ' + download_url)
@@ -61,6 +69,7 @@ def download_pic(pic_url, download_path='download', only_max=True, pic_format='j
                 file_name = str(x) + '_' + str(y) + '.' + pic_format
                 save_file(download_path + '/' + str(folder) + '/', file_name,
                           result.content)
+                is_begin = True
                 y_max = max(y, y_max)
                 y = y + 1
             else:
@@ -71,30 +80,47 @@ def download_pic(pic_url, download_path='download', only_max=True, pic_format='j
                     x_max = max(x, x_max)
                     x = x + 1
                     y = 0
-        folder = folder + 1
+        if is_begin and only_max:
+            break
+        folder = folder - 1
     print('Download Finish!')
-    return x_max, y_max
+    return x_max, y_max, folder
 
 
-def merge_pic(x_max, y_max, download_path='download', only_max=True, pic_format='jpg'):
-    folder = 13 if only_max else 0
-    while folder <= 13:
+def merge_pic(x_max, y_max, folder_max, download_path='download', only_max=True, pic_format='jpg'):
+    folder = folder_max
+    while folder >= 0:
         image_first = Image.open(download_path + '/' + str(folder) + '/0_0.jpg')
         image_last_x = Image.open(download_path + '/' + str(folder) + '/' + str(x_max) + '_0.' + pic_format)
         image_last_y = Image.open(download_path + '/' + str(folder) + '/0_' + str(y_max) + '.' + pic_format)
         (block_width, block_height) = image_first.size
+        block_width = block_width + 1
+        block_height = block_height + 1
         (last_width, _) = image_last_x.size
         (_, last_height) = image_last_y.size
-        result_width = block_width * x_max + last_width
-        result_height = block_height * y_max + last_height
+        result_width = block_width * x_max + last_width - 1
+        result_height = block_height * y_max + last_height - 1
         image_result = Image.new('RGB', (result_width, result_height))
         pic_path = download_path + '/' + str(folder) + '/'
         for x in range(0, x_max + 1):
             for y in range(0, y_max + 1):
                 image_block = Image.open(pic_path + str(x) + '_' + str(y) + '.' + pic_format)
-                image_result.paste(image_block, (x * block_width, y * block_height))
+                (w, h) = image_block.size
+                if w > block_width or h > block_height:
+                    break
+                paste_x, paste_y = x * block_width, y * block_height
+                if x != 0:
+                    paste_x = paste_x - 1
+                if y != 0:
+                    paste_y = paste_y - 1
+                image_result.paste(image_block, (paste_x, paste_y))
+            else:
+                continue
+            break
         image_result.save(download_path + '/pic_' + str(folder) + '.jpg')
-        folder = folder + 1
+        if only_max:
+            break
+        folder = folder - 1
     print('Save Finish!')
 
 
@@ -137,10 +163,10 @@ if "__main__" == __name__:
             show_help()
             sys.exit(2)
     try:
-        index_x, index_y = download_pic(url, download_path=save_path,
-                                        only_max=is_only_max,
-                                        pic_format=img_format)
-        merge_pic(index_x, index_y,
+        index_x, index_y, index_folder = download_pic(url, download_path=save_path,
+                                                      only_max=is_only_max,
+                                                      pic_format=img_format)
+        merge_pic(index_x, index_y, index_folder,
                   download_path=save_path,
                   only_max=is_only_max,
                   pic_format=img_format)
