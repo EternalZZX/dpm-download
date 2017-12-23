@@ -6,6 +6,7 @@ import getopt
 import sys
 import os
 import re
+import math
 
 from sys import argv
 from PIL import Image
@@ -100,24 +101,38 @@ def merge_pic(x_max, y_max, folder_max, download_path='download', only_max=True,
         (_, last_height) = image_last_y.size
         result_width = block_width * x_max + last_width - 1
         result_height = block_height * y_max + last_height - 1
-        image_result = Image.new('RGB', (result_width, result_height))
         pic_path = download_path + '/' + str(folder) + '/'
-        for x in range(0, x_max + 1):
-            for y in range(0, y_max + 1):
-                image_block = Image.open(pic_path + str(x) + '_' + str(y) + '.' + pic_format)
-                (w, h) = image_block.size
-                if w > block_width or h > block_height:
-                    break
-                paste_x, paste_y = x * block_width, y * block_height
-                if x != 0:
-                    paste_x = paste_x - 1
-                if y != 0:
-                    paste_y = paste_y - 1
-                image_result.paste(image_block, (paste_x, paste_y))
-            else:
-                continue
-            break
-        image_result.save(download_path + '/pic_' + str(folder) + '.jpg')
+        pic_num = 1
+        half_width = result_width
+        x_min, x_mid = 0, x_max
+        if result_width > 65500:
+            x_mid = int(math.ceil(x_max / 2))
+            half_width = block_width * x_mid - 1
+            pic_num = 2
+        for i in range(0, pic_num):
+            image_result = Image.new('RGB', (half_width, result_height))
+            for x in range(x_min, x_mid + 1):
+                for y in range(0, y_max + 1):
+                    image_block = Image.open(pic_path + str(x) + '_' + str(y) + '.' + pic_format)
+                    (w, h) = image_block.size
+                    if w > block_width or h > block_height:
+                        break
+                    paste_x, paste_y = (x - x_min) * block_width, y * block_height
+                    if x != 0:
+                        paste_x = paste_x - 1
+                    if y != 0:
+                        paste_y = paste_y - 1
+                    image_result.paste(image_block, (paste_x, paste_y))
+                else:
+                    continue
+                break
+            pic_name = 'pic_' + str(folder) + '.jpg'
+            if pic_num:
+                pic_name = 'pic_' + str(folder) + '_' + str(i) + '.jpg'
+            image_result.save(download_path + '/' + pic_name)
+            half_width = result_width - half_width
+            x_min = x_mid
+            x_mid = x_max
         if only_max:
             break
         folder = folder - 1
@@ -170,6 +185,10 @@ if "__main__" == __name__:
                   download_path=save_path,
                   only_max=is_only_max,
                   pic_format=img_format)
+        # merge_pic(38, 12, 14,
+        #           download_path=save_path,
+        #           only_max=is_only_max,
+        #           pic_format=img_format)
     except Exception as e:
         print('Error: ' + str(e))
         sys.exit(1)
